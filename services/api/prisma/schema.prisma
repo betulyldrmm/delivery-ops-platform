@@ -12,6 +12,7 @@ generator client {
 
 enum Role {
   CUSTOMER
+  COURIER
   OPS
   ADMIN
 }
@@ -21,6 +22,7 @@ enum OrderStatus {
   PREPARING
   READY
   ASSIGNED
+  PICKED_UP
   ON_ROUTE
   DELIVERED
   CANCELLED
@@ -47,6 +49,7 @@ enum DeliveryMode {
 enum AlertType {
   DELAY_RISK
   WEATHER_RISK
+  TRAFFIC_RISK
   STOCK_RISK
 }
 

@@ -34,6 +34,7 @@ export default function AdminPage() {
         <div key={u.id} className="p-2 bg-white border mb-2">
           {u.email} - {u.role}
           <button className="ml-2 px-2 py-1 bg-gray-200" onClick={() => updateRole(u.id, "OPS")}>Set OPS</button>
+          <button className="ml-2 px-2 py-1 bg-gray-200" onClick={() => updateRole(u.id, "COURIER")}>Set COURIER</button>
         </div>
       ))}
     </div>

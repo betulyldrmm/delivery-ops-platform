@@ -23,7 +23,7 @@ export default function ProfilePage() {
 
   function logout() {
     clearAuth();
-    router.push("/login");
+    router.replace("/login");
   }
 
   return (

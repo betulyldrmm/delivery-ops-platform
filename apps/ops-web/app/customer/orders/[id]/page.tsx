@@ -48,12 +48,13 @@ export default function OrderDetailPage() {
     setMeta(getOrderMeta(id));
   }, [id]);
 
-  const steps = ["CREATED", "PREPARING", "READY", "ASSIGNED", "ON_ROUTE", "DELIVERED"];
+  const steps = ["CREATED", "PREPARING", "READY", "ASSIGNED", "PICKED_UP", "ON_ROUTE", "DELIVERED"];
   const stepLabels: Record<string, string> = {
     CREATED: "Alındı",
     PREPARING: "Hazırlanıyor",
     READY: "Hazır",
     ASSIGNED: "Kurye Atandı",
+    PICKED_UP: "Picked up",
     ON_ROUTE: "Yolda",
     DELIVERED: "Teslim Edildi"
   };
@@ -71,7 +72,7 @@ export default function OrderDetailPage() {
   if (!order || !tracking) return <div>Yükleniyor...</div>;
 
   const canCancel = ["CREATED", "PREPARING"].includes(order.status);
-  const hasAlert = tracking.alerts && tracking.alerts.length > 0;
+  const alertItems = (tracking.alerts || []).slice(0, 3);
 
   return (
     <div className="max-w-3xl space-y-5">
@@ -145,8 +146,24 @@ export default function OrderDetailPage() {
             : "Şu an görünmüyor"}
         </div>
         <div className="text-sm text-gray-600">Gecikme: {order.etaDeltaMinutes} dk</div>
-        {hasAlert && (
-          <div className="text-sm text-amber-700">Uyarı: {tracking.alerts[0].type}</div>
+        {alertItems.length > 0 && (
+          <div className="text-sm text-amber-700 space-y-1">
+            {alertItems.map((alert: any) => (
+              <div key={alert.id || `${alert.type}-${alert.createdAt}`}>
+                {alert.type} ({alert.severity})
+              </div>
+            ))}
+          </div>
+        )}
+        {tracking.weather && (
+          <div className="text-sm text-gray-600">
+            Weather: {tracking.weather.payload?.condition || "-"} ({tracking.weather.severity})
+          </div>
+        )}
+        {tracking.traffic && (
+          <div className="text-sm text-gray-600">
+            Traffic: {tracking.traffic.level} (ETA {tracking.traffic.eta_with_traffic_min ?? "n/a"} min)
+          </div>
         )}
         {tracking.trafficUnavailable && (
           <div className="text-xs text-gray-500">

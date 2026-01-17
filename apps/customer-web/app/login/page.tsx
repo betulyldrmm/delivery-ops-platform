@@ -4,7 +4,6 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { apiFetch } from "../../lib/api";
 import { useAuth } from "../../lib/auth-context";
-import { ROLE_HOME } from "../../lib/role-home";
 
 export default function LoginPage() {
   const router = useRouter();
@@ -22,14 +21,14 @@ export default function LoginPage() {
         auth: false,
         body: JSON.stringify({ grant_type: "password", identifier, password })
       });
-      if (process.env.NODE_ENV !== "production") {
-        console.log("role", res.user.role);
+      if (res.user?.role && res.user.role !== "CUSTOMER") {
+        setError("This login is for customer accounts only.");
+        return;
       }
       setAuth(res.access_token, res.user.role, res.user);
-      const nextPath = ROLE_HOME[res.user.role] || "/login";
-      router.replace(nextPath);
+      router.replace("/");
     } catch (err: any) {
-      setError("Giris basarisiz");
+      setError("Login failed");
     }
   }
 

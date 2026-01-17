@@ -2,26 +2,20 @@
 
 import { useEffect } from "react";
 import { useRouter } from "next/navigation";
-import { getRole } from "../lib/auth";
+import { getRole, getToken } from "../lib/auth";
+import { ROLE_HOME } from "../lib/role-home";
 
 export default function HomePage() {
   const router = useRouter();
 
   useEffect(() => {
+    const token = getToken();
     const role = getRole();
-    if (!role) {
+    if (!token || !role) {
       router.replace("/login");
       return;
     }
-    if (role === "CUSTOMER") {
-      router.replace("/customer");
-      return;
-    }
-    if (role === "ADMIN") {
-      router.replace("/admin");
-      return;
-    }
-    router.replace("/ops");
+    router.replace(ROLE_HOME[role] || "/login");
   }, [router]);
 
   return <div className="text-sm text-gray-500">Redirecting...</div>;

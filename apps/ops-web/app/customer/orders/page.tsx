@@ -34,6 +34,7 @@ export default function OrdersPage() {
       PREPARING: "Hazırlanıyor",
       READY: "Hazır",
       ASSIGNED: "Kurye Atandı",
+    PICKED_UP: "Picked up",
       ON_ROUTE: "Yolda",
       DELIVERED: "Teslim Edildi",
       CANCELLED: "İptal"
@@ -44,7 +45,9 @@ export default function OrdersPage() {
   function statusClass(status: string) {
     if (status === "DELIVERED") return "bg-emerald-50 text-emerald-700";
     if (status === "CANCELLED") return "bg-red-50 text-red-700";
-    if (status === "ON_ROUTE" || status === "ASSIGNED") return "bg-amber-50 text-amber-700";
+    if (status === "ON_ROUTE" || status === "ASSIGNED" || status === "PICKED_UP") {
+      return "bg-amber-50 text-amber-700";
+    }
     return "bg-slate-100 text-slate-700";
   }
 

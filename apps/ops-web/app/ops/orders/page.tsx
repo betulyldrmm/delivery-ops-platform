@@ -50,6 +50,7 @@ export default function OrdersPage() {
             <div className="flex gap-2 mt-2">
               <button className="px-2 py-1 bg-gray-200" onClick={() => setStatus(o.id, "PREPARING")}>PREPARING</button>
               <button className="px-2 py-1 bg-gray-200" onClick={() => setStatus(o.id, "READY")}>READY</button>
+              <button className="px-2 py-1 bg-gray-200" onClick={() => setStatus(o.id, "PICKED_UP")}>PICKED_UP</button>
               <button className="px-2 py-1 bg-gray-200" onClick={() => setStatus(o.id, "ON_ROUTE")}>ON_ROUTE</button>
               <button className="px-2 py-1 bg-gray-200" onClick={() => setStatus(o.id, "DELIVERED")}>DELIVERED</button>
               <button className="px-2 py-1 bg-black text-white" onClick={() => assign(o.id)}>Assign</button>

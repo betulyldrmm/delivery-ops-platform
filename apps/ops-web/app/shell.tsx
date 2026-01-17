@@ -24,12 +24,14 @@ const opsLinks: NavLink[] = [
   { href: "/ops/reports", label: "Reports" }
 ];
 
+const courierLinks: NavLink[] = [{ href: "/courier", label: "My Orders" }];
+
 const adminLinks: NavLink[] = [{ href: "/admin", label: "Users & Roles" }];
 
 export default function AppShell({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
   const router = useRouter();
-  const { role, clearAuth } = useAuth();
+  const { role, user, clearAuth } = useAuth();
 
   if (pathname === "/login") {
     return <main className="p-6">{children}</main>;
@@ -42,6 +44,9 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
   if (role === "OPS") {
     sections.push({ title: "Ops", links: opsLinks });
   }
+  if (role === "COURIER") {
+    sections.push({ title: "Courier", links: courierLinks });
+  }
   if (role === "ADMIN") {
     sections.push({ title: "Ops", links: opsLinks });
     sections.push({ title: "Admin", links: adminLinks });
@@ -49,8 +54,10 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
 
   function logout() {
     clearAuth();
-    router.push("/login");
+    router.replace("/login");
   }
+
+  const whoAmI = user?.email ? `${user.email} (${role || "-"})` : role ? `(${role})` : "Not signed in";
 
   return (
     <div className="min-h-screen flex bg-gray-50 text-gray-900">
@@ -72,17 +79,18 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
             </div>
           ))}
         </nav>
-        {role === "CUSTOMER" ? (
-          <button className="mt-6 text-sm text-gray-700 underline" onClick={logout}>
-            Çıkış
-          </button>
-        ) : (
-          <button className="mt-6 text-xs text-gray-600 underline" onClick={logout}>
+      </aside>
+      <main className="flex-1 p-6">
+        <div className="mb-6 flex items-center justify-between text-sm">
+          <div className="text-gray-600">
+            Signed in as <span className="font-medium text-gray-900">{whoAmI}</span>
+          </div>
+          <button className="text-gray-700 underline" onClick={logout}>
             Logout
           </button>
-        )}
-      </aside>
-      <main className="flex-1 p-6">{children}</main>
+        </div>
+        {children}
+      </main>
     </div>
   );
 }

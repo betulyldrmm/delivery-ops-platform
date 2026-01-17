@@ -19,3 +19,17 @@ export function getRole() {
 export function setRole(role: string) {
   localStorage.setItem("role", role);
 }
+
+export function clearRole() {
+  localStorage.removeItem("role");
+}
+
+export function setAuth(token: string, role: string) {
+  setToken(token);
+  setRole(role);
+}
+
+export function clearAuth() {
+  clearToken();
+  clearRole();
+}

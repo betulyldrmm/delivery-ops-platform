@@ -13,8 +13,13 @@ export class ApiError extends Error {
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:3000/api";
 
-export async function apiFetch(path: string, options: any = {}) {
-  const token = getToken();
+type ApiFetchOptions = RequestInit & {
+  auth?: boolean;
+  token?: string | null;
+};
+
+export async function apiFetch(path: string, options: ApiFetchOptions = {}) {
+  const token = options.auth === false ? null : options.token ?? getToken();
   const headers: Record<string, string> = {
     "Content-Type": "application/json",
     ...(options.headers || {})

@@ -154,16 +154,23 @@ export class OrdersService {
       include: { courier: true }
     });
     const courier = assignment?.courier;
-    const snapshot = await this.prisma.trafficSnapshot.findFirst({
+    const trafficSnapshot = await this.prisma.trafficSnapshot.findFirst({
+      where: { geoScope: order.id },
+      orderBy: { expiresAt: "desc" }
+    });
+    const weatherSnapshot = await this.prisma.weatherSnapshot.findFirst({
+      where: { geoScope: order.id },
       orderBy: { expiresAt: "desc" }
     });
     let trafficUnavailable = true;
     let trafficSnapshotAgeMin: number | null = null;
-    if (snapshot) {
-      trafficUnavailable = snapshot.expiresAt < new Date();
-      const ageMs = Date.now() - snapshot.expiresAt.getTime();
+    if (trafficSnapshot) {
+      trafficUnavailable = trafficSnapshot.expiresAt < new Date();
+      const ageMs = Date.now() - trafficSnapshot.expiresAt.getTime();
       trafficSnapshotAgeMin = Math.abs(Math.floor(ageMs / 60000));
     }
+    const trafficPayload = (trafficSnapshot?.payload || {}) as Record<string, any>;
+    const weatherPayload = (weatherSnapshot?.payload || {}) as Record<string, any>;
     return {
       order,
       map: {
@@ -171,6 +178,23 @@ export class OrdersService {
         etaMinutes: order.currentEta
       },
       alerts,
+      weather: weatherSnapshot
+        ? {
+            severity: weatherPayload.severity || "UNKNOWN",
+            source: weatherSnapshot.source,
+            expiresAt: weatherSnapshot.expiresAt,
+            payload: weatherPayload
+          }
+        : null,
+      traffic: trafficSnapshot
+        ? {
+            level: trafficPayload.level || "UNKNOWN",
+            eta_normal_min: trafficPayload.eta_normal_min ?? null,
+            eta_with_traffic_min: trafficPayload.eta_with_traffic_min ?? null,
+            source: trafficSnapshot.source,
+            expiresAt: trafficSnapshot.expiresAt
+          }
+        : null,
       trafficUnavailable,
       trafficSnapshotAgeMin
     };

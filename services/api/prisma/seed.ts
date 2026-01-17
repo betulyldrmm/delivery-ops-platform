@@ -9,6 +9,7 @@ async function main() {
   await prisma.user.createMany({
     data: [
       { email: "customer@getir.test", role: "CUSTOMER", passwordHash: hash },
+      { email: "courier@getir.test", role: "COURIER", passwordHash: hash },
       { email: "ops@getir.test", role: "OPS", passwordHash: hash },
       { email: "admin@getir.test", role: "ADMIN", passwordHash: hash }
     ],
@@ -16,6 +17,22 @@ async function main() {
   });
 
   const customer = await prisma.user.findUnique({ where: { email: "customer@getir.test" } });
+  const courierUser = await prisma.user.findUnique({ where: { email: "courier@getir.test" } });
+  if (courierUser) {
+    const existingCourier = await prisma.courier.findUnique({ where: { id: courierUser.id } });
+    if (!existingCourier) {
+      await prisma.courier.create({
+        data: {
+          id: courierUser.id,
+          name: "Demo Courier",
+          currentLat: 41.02,
+          currentLon: 29.0,
+          isAvailable: true,
+          capacity: 1
+        }
+      });
+    }
+  }
   if (customer) {
     let address = await prisma.address.findFirst({ where: { userId: customer.id } });
     if (!address) {

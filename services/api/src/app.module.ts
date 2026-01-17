@@ -6,6 +6,7 @@ import { RealtimeModule } from "./realtime/realtime.module";
 import { AuthModule } from "./auth/auth.module";
 import { OrdersModule } from "./orders/orders.module";
 import { OpsModule } from "./ops/ops.module";
+import { CourierModule } from "./courier/courier.module";
 import { AlertsModule } from "./alerts/alerts.module";
 import { UploadsModule } from "./uploads/uploads.module";
 import { IntegrationsModule } from "./integrations/integrations.module";
@@ -21,6 +22,7 @@ import { CatalogModule } from "./catalog/catalog.module";
     AuthModule,
     OrdersModule,
     OpsModule,
+    CourierModule,
     AlertsModule,
     UploadsModule,
     IntegrationsModule,

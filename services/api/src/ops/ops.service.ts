@@ -37,7 +37,7 @@ export class OpsService {
 
   async getDashboard() {
     const activeOrders = await this.prisma.order.count({
-      where: { status: { in: ["CREATED", "PREPARING", "READY", "ASSIGNED", "ON_ROUTE"] } }
+      where: { status: { in: ["CREATED", "PREPARING", "READY", "ASSIGNED", "PICKED_UP", "ON_ROUTE"] } }
     });
     const delayedOrders = await this.prisma.order.count({ where: { etaDeltaMinutes: { gte: 10 } } });
     const slaBreached = await this.prisma.order.count({ where: { etaDeltaMinutes: { gte: 30 } } });
@@ -87,14 +87,20 @@ export class OpsService {
   async assignCourier(actorId: string, id: string, courierId: string) {
     const order = await this.getOrder(id);
     const isUuid = (value: string) => /^[0-9a-fA-F-]{36}$/.test(value);
+    let resolvedCourierId = courierId && isUuid(courierId) ? courierId : null;
+    let courierUser = null;
+    if (!resolvedCourierId) {
+      courierUser = await this.prisma.user.findFirst({ where: { role: "COURIER" } });
+      resolvedCourierId = courierUser?.id || null;
+    }
     let courier;
-    if (courierId && isUuid(courierId)) {
+    if (resolvedCourierId) {
       courier = await this.prisma.courier.upsert({
-        where: { id: courierId },
+        where: { id: resolvedCourierId },
         update: { isAvailable: false },
         create: {
-          id: courierId,
-          name: "Demo Courier",
+          id: resolvedCourierId,
+          name: courierUser?.email || "Demo Courier",
           currentLat: 41.02,
           currentLon: 29.0,
           isAvailable: false,
@@ -156,7 +162,19 @@ export class OpsService {
 
   async getMap() {
     const couriers = await this.prisma.courier.findMany();
-    const activeStatuses: OrderStatus[] = [OrderStatus.ASSIGNED, OrderStatus.ON_ROUTE];
+    const activeStatuses: OrderStatus[] = [
+      OrderStatus.CREATED,
+      OrderStatus.PREPARING,
+      OrderStatus.READY,
+      OrderStatus.ASSIGNED,
+      OrderStatus.PICKED_UP,
+      OrderStatus.ON_ROUTE
+    ];
+    const zoneCenters: Record<string, { lat: number; lon: number }> = {
+      "zone-a": { lat: 41.015, lon: 28.979 },
+      "zone-b": { lat: 41.025, lon: 28.99 },
+      "zone-c": { lat: 41.03, lon: 29.005 }
+    };
     const orders = await this.prisma.order.findMany({
       where: { status: { in: activeStatuses } },
       include: {
@@ -185,12 +203,19 @@ export class OpsService {
       etaDeltaMinutes: number;
       delayReason: string | null;
       delayLevel: "GREEN" | "YELLOW" | "RED";
-      courier: { id: string; lat: number; lon: number };
+      pickup: { lat: number; lon: number } | null;
+      dropoff: { lat: number; lon: number } | null;
+      courier: { id: string; lat: number; lon: number } | null;
     }> = [];
 
     for (const order of orders) {
       const assignment = order.assignments[0];
-      if (!assignment?.courier) continue;
+      const courier = assignment?.courier;
+      const pickup = zoneCenters[order.restaurantZone] || null;
+      const dropoff =
+        Number.isFinite(order.addressLat) && Number.isFinite(order.addressLon)
+          ? { lat: order.addressLat, lon: order.addressLon }
+          : null;
       mapOrders.push({
         id: order.id,
         status: order.status,
@@ -198,15 +223,28 @@ export class OpsService {
         etaDeltaMinutes: order.etaDeltaMinutes,
         delayReason: order.delayReason ?? null,
         delayLevel: this.computeDelayLevel(order.etaDeltaMinutes),
-        courier: {
-          id: assignment.courier.id,
-          lat: assignment.courier.currentLat,
-          lon: assignment.courier.currentLon
-        }
+        pickup,
+        dropoff,
+        courier: courier
+          ? {
+              id: courier.id,
+              lat: courier.currentLat,
+              lon: courier.currentLon
+            }
+          : null
       });
     }
 
-    return { couriers, orders: mapOrders, trafficStatus, lastSnapshotAgeMin };
+    const mappedCouriers = couriers.map((courier) => ({
+      id: courier.id,
+      lat: courier.currentLat,
+      lon: courier.currentLon,
+      isAvailable: courier.isAvailable,
+      status: courier.status,
+      lastLocationAt: courier.lastLocationAt
+    }));
+
+    return { couriers: mappedCouriers, orders: mapOrders, trafficStatus, lastSnapshotAgeMin };
   }
 
   async listInventory() {

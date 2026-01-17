@@ -61,6 +61,11 @@ setInterval(async () => {
   await redis.set("worker:heartbeat", new Date().toISOString(), "EX", 20);
 }, 10000);
 
+writeIntegrationSnapshots().catch(() => {});
+setInterval(() => {
+  writeIntegrationSnapshots().catch(() => {});
+}, snapshotIntervalMs);
+
 async function emit(room: string, event: string, payload: any) {
   await axios.post(
     `${apiBaseUrl}/internal/realtime/emit`,
@@ -74,6 +79,152 @@ function computeRisk(promised: number, current: number) {
   const ratio = current / promised;
   const riskScore = Math.min(1, Math.max(0, delta / 30));
   return { delta, ratio, riskScore };
+}
+
+function hashSeed(value: string) {
+  let hash = 0;
+  for (let i = 0; i < value.length; i += 1) {
+    hash = (hash * 31 + value.charCodeAt(i)) % 100000;
+  }
+  return hash;
+}
+
+function seededFraction(seed: number) {
+  return (seed % 1000) / 1000;
+}
+
+function pick<T>(items: T[], seed: number) {
+  return items[seed % items.length];
+}
+
+function buildWeatherPayload(order: any, nowMs: number) {
+  const bucket = Math.floor(nowMs / 600000);
+  const seed = hashSeed(`${order.id}:${bucket}`);
+  const severity = seed % 10 >= 8 ? "HIGH" : seed % 10 >= 5 ? "MEDIUM" : "LOW";
+  const conditions =
+    severity === "HIGH"
+      ? ["storm", "heavy_rain", "snow"]
+      : severity === "MEDIUM"
+        ? ["rain", "wind"]
+        : ["clear", "cloudy"];
+  const temperature = Math.round(5 + seededFraction(seed + 1) * 25);
+  const windKph = Math.round(5 + seededFraction(seed + 2) * 40);
+  const precipitation =
+    severity === "LOW" ? 0 : Math.round(seededFraction(seed + 3) * 12);
+  return {
+    severity,
+    condition: pick(conditions, seed),
+    temperature_c: temperature,
+    wind_kph: windKph,
+    precipitation_mm: precipitation,
+    lat: order.addressLat ?? null,
+    lon: order.addressLon ?? null,
+    order_id: order.id
+  };
+}
+
+function buildTrafficPayload(order: any, nowMs: number) {
+  const bucket = Math.floor(nowMs / 300000);
+  const seed = hashSeed(`${order.id}:${bucket}`);
+  const etaNormal = Math.max(10, Number(order.promisedEta || 20));
+  const factor = 1 + seededFraction(seed + 5) * 0.8;
+  const etaWithTraffic = Math.max(etaNormal, Math.round(etaNormal * factor));
+  const level = factor >= 1.5 ? "HIGH" : factor >= 1.25 ? "MEDIUM" : "LOW";
+  return {
+    level,
+    eta_normal_min: etaNormal,
+    eta_with_traffic_min: etaWithTraffic,
+    factor,
+    order_id: order.id
+  };
+}
+
+let snapshotsRunning = false;
+const snapshotIntervalMs = 45000;
+
+async function createAlertIfMissing(order: any, type: string, severity: string) {
+  const thirtyMinAgo = new Date(Date.now() - 30 * 60000);
+  const existing = await prisma.alert.findFirst({
+    where: { orderId: order.id, type, createdAt: { gte: thirtyMinAgo } }
+  });
+  if (existing) return;
+
+  const alert = await prisma.alert.create({
+    data: {
+      orderId: order.id,
+      type,
+      severity,
+      isNew: true
+    }
+  });
+  await prisma.notificationLog.create({
+    data: {
+      userId: order.customerId,
+      orderId: order.id,
+      alertType: type,
+      channel: "IN_APP",
+      status: "QUEUED"
+    }
+  });
+  await emit(`customer:${order.customerId}`, "customer.alerts.new", {
+    alert_id: alert.id,
+    order_id: order.id,
+    type: alert.type,
+    severity: alert.severity
+  });
+  await emit("ops", "ops.alerts.new", {
+    alert_id: alert.id,
+    order_id: order.id,
+    type: alert.type,
+    severity: alert.severity
+  });
+}
+
+async function writeIntegrationSnapshots() {
+  if (snapshotsRunning) return;
+  snapshotsRunning = true;
+  try {
+    const activeOrders = await prisma.order.findMany({
+      where: {
+        status: {
+          in: ["CREATED", "PREPARING", "READY", "ASSIGNED", "PICKED_UP", "ON_ROUTE"]
+        }
+      }
+    });
+    const nowMs = Date.now();
+    for (const order of activeOrders) {
+      const weatherPayload = buildWeatherPayload(order, nowMs);
+      const weatherExpires = new Date(nowMs + 30 * 60000);
+      await prisma.weatherSnapshot.create({
+        data: {
+          source: "mock",
+          payload: weatherPayload,
+          expiresAt: weatherExpires,
+          geoScope: order.id
+        }
+      });
+      if (weatherPayload.severity !== "LOW") {
+        await createAlertIfMissing(order, "WEATHER_RISK", weatherPayload.severity);
+      }
+
+      const trafficPayload = buildTrafficPayload(order, nowMs);
+      const trafficExpires = new Date(nowMs + 5 * 60000);
+      await prisma.trafficSnapshot.create({
+        data: {
+          source: "mock",
+          payload: trafficPayload,
+          expiresAt: trafficExpires,
+          geoScope: order.id
+        }
+      });
+      if (trafficPayload.level !== "LOW") {
+        const severity = trafficPayload.level === "HIGH" ? "HIGH" : "MEDIUM";
+        await createAlertIfMissing(order, "TRAFFIC_RISK", severity);
+      }
+    }
+  } finally {
+    snapshotsRunning = false;
+  }
 }
 
 new Worker(

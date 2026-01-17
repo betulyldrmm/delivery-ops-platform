@@ -2,7 +2,7 @@
 
 import { createContext, useContext, useEffect, useMemo, useState } from "react";
 import { apiFetch } from "./api";
-import { clearAuthCookies, getRole, getToken, setAuthCookies } from "./auth";
+import { clearAuth as clearAuthStorage, getRole, getToken, setAuth as setAuthStorage } from "./auth";
 
 type AuthUser = {
   id: string;
@@ -60,13 +60,13 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       role,
       user,
       setAuth: (nextToken, nextRole, nextUser) => {
-        setAuthCookies(nextToken, nextRole);
+        setAuthStorage(nextToken, nextRole);
         setToken(nextToken);
         setRole(nextRole);
         setUser(nextUser ?? null);
       },
       clearAuth: () => {
-        clearAuthCookies();
+        clearAuthStorage();
         setToken(null);
         setRole(null);
         setUser(null);
