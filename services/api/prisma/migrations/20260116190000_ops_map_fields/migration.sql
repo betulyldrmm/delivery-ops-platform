@@ -1,0 +1,11 @@
+CREATE TYPE "CourierStatus" AS ENUM ('OFFLINE', 'AVAILABLE', 'ON_DELIVERY');
+
+ALTER TABLE "Order" ADD COLUMN "delayReason" TEXT;
+
+ALTER TABLE "Courier"
+ADD COLUMN "lastLocationAt" TIMESTAMP(3),
+ADD COLUMN "status" "CourierStatus" NOT NULL DEFAULT 'AVAILABLE';
+
+ALTER TABLE "CourierAssignment"
+ADD COLUMN "endedAt" TIMESTAMP(3),
+ADD COLUMN "isActive" BOOLEAN NOT NULL DEFAULT true;

@@ -1,0 +1,277 @@
+// Prisma schema
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+generator client {
+  provider = "prisma-client-js"
+  binaryTargets = ["native", "debian-openssl-3.0.x"]
+}
+
+enum Role {
+  CUSTOMER
+  OPS
+  ADMIN
+}
+
+enum OrderStatus {
+  CREATED
+  PREPARING
+  READY
+  ASSIGNED
+  ON_ROUTE
+  DELIVERED
+  CANCELLED
+}
+
+enum PaymentStatus {
+  PENDING
+  PAID
+  FAILED
+  REFUNDED
+}
+
+enum RefundStatus {
+  NONE
+  PENDING
+  CREDIT_ISSUED
+}
+
+enum DeliveryMode {
+  INSTANT
+  SCHEDULED
+}
+
+enum AlertType {
+  DELAY_RISK
+  WEATHER_RISK
+  STOCK_RISK
+}
+
+enum AlertSeverity {
+  LOW
+  MEDIUM
+  HIGH
+}
+
+enum IssueType {
+  MISSING
+  DAMAGED
+  LATE
+}
+
+enum IssueStatus {
+  OPEN
+  IN_REVIEW
+  RESOLVED
+}
+
+enum NotificationChannel {
+  PUSH
+  IN_APP
+  SMS
+  EMAIL
+}
+
+enum NotificationStatus {
+  QUEUED
+  SENT
+  FAILED
+}
+
+enum UploadStatus {
+  QUEUED
+  RUNNING
+  COMPLETED
+  FAILED
+}
+
+enum CourierStatus {
+  OFFLINE
+  AVAILABLE
+  ON_DELIVERY
+}
+
+model User {
+  id           String    @id @default(uuid())
+  role         Role
+  email        String?   @unique
+  phone        String?   @unique
+  passwordHash String
+  createdAt    DateTime  @default(now())
+  addresses    Address[]
+  orders       Order[]
+}
+
+model Address {
+  id       String  @id @default(uuid())
+  userId   String
+  label    String
+  line1    String?
+  city     String?
+  district String?
+  lat      Float
+  lon      Float
+  user     User    @relation(fields: [userId], references: [id])
+}
+
+model Order {
+  id              String             @id @default(uuid())
+  customerId      String
+  status          OrderStatus
+  createdAt       DateTime           @default(now())
+  promisedEta     Int
+  currentEta      Int
+  etaDeltaMinutes Int
+  riskScore       Float
+  riskReasons     Json?
+  delayReason     String?
+  deliveryMode    DeliveryMode
+  restaurantZone  String
+  customerZone    String
+  addressLat      Float
+  addressLon      Float
+  paymentStatus   PaymentStatus
+  refundStatus    RefundStatus
+  externalId      String?            @unique
+  items           OrderItem[]
+  alerts          Alert[]
+  issues          IssueTicket[]
+  assignments     CourierAssignment[]
+  statusEvents    OrderStatusEvent[]
+  customer        User               @relation(fields: [customerId], references: [id])
+}
+
+model OrderItem {
+  id        String @id @default(uuid())
+  orderId   String
+  name      String
+  quantity  Int
+  unitPrice Float
+  order     Order  @relation(fields: [orderId], references: [id])
+}
+
+model OrderStatusEvent {
+  id          String      @id @default(uuid())
+  orderId     String
+  status      OrderStatus
+  actorUserId String?
+  createdAt   DateTime    @default(now())
+  order       Order       @relation(fields: [orderId], references: [id])
+}
+
+model Courier {
+  id              String   @id @default(uuid())
+  name            String
+  currentLat      Float
+  currentLon      Float
+  isAvailable     Boolean
+  capacity        Int
+  lastHeartbeatAt DateTime?
+  lastLocationAt  DateTime?
+  status          CourierStatus @default(AVAILABLE)
+  assignments     CourierAssignment[]
+}
+
+model CourierAssignment {
+  id         String   @id @default(uuid())
+  orderId    String
+  courierId  String
+  assignedAt DateTime @default(now())
+  endedAt    DateTime?
+  isActive   Boolean  @default(true)
+  order      Order    @relation(fields: [orderId], references: [id])
+  courier    Courier  @relation(fields: [courierId], references: [id])
+}
+
+model Alert {
+  id             String        @id @default(uuid())
+  type           AlertType
+  severity       AlertSeverity
+  orderId        String
+  isNew          Boolean
+  acknowledgedBy String?
+  reason         String?
+  createdAt      DateTime      @default(now())
+  order          Order         @relation(fields: [orderId], references: [id])
+}
+
+model NotificationLog {
+  id               String             @id @default(uuid())
+  userId           String?
+  orderId          String?
+  alertType        String?
+  channel          NotificationChannel
+  status           NotificationStatus
+  sentAt           DateTime?
+  providerResponse String?
+  createdAt        DateTime           @default(now())
+}
+
+model UploadBatch {
+  id          String       @id @default(uuid())
+  fileUrl     String
+  status      UploadStatus
+  totalRows   Int
+  successRows Int
+  failedRows  Int
+  createdAt   DateTime     @default(now())
+  rows        UploadRow[]
+}
+
+model UploadRow {
+  id              String       @id @default(uuid())
+  uploadBatchId   String
+  rawRow          Json
+  normalizedRow   Json?
+  error           String?
+  orderExternalId String?      @unique
+  orderId         String?
+  createdAt       DateTime     @default(now())
+  batch           UploadBatch  @relation(fields: [uploadBatchId], references: [id])
+}
+
+model TrafficSnapshot {
+  id        String   @id @default(uuid())
+  source    String
+  payload   Json
+  expiresAt DateTime
+  geoScope  String
+}
+
+model WeatherSnapshot {
+  id        String   @id @default(uuid())
+  source    String
+  payload   Json
+  expiresAt DateTime
+  geoScope  String
+}
+
+model Inventory {
+  id          String @id @default(uuid())
+  productName String
+  qty         Int
+}
+
+model AuditLog {
+  id         String   @id @default(uuid())
+  actorUserId String?
+  action     String
+  entityType String
+  entityId   String?
+  metadata   Json?
+  createdAt  DateTime @default(now())
+}
+
+model IssueTicket {
+  id         String      @id @default(uuid())
+  orderId    String
+  customerId String
+  type       IssueType
+  status     IssueStatus
+  createdAt  DateTime    @default(now())
+  updatedAt  DateTime    @updatedAt
+  order      Order       @relation(fields: [orderId], references: [id])
+}
